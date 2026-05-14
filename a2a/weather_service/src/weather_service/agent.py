@@ -123,6 +123,31 @@ class A2AEvent:
             )
 
 
+class _FixedRequestHandler(DefaultRequestHandler):
+    """Workaround for a2a-sdk bug: _run_event_stream() only calls queue.close()
+    after a clean return from execute(), so a CancelledError (e.g. client
+    disconnect) leaves the queue open.  EventConsumer then polls forever at
+    0.5 s intervals, generating a CancelledError every tick and ultimately
+    starving the uvicorn event loop so new TCP connections are refused.
+
+    Fix: catch BaseException and synchronously set _is_closed before re-raising,
+    so the next dequeue_event() call on an empty queue raises QueueEmpty and the
+    consumer exits cleanly.  Synchronous assignment avoids the problem of
+    awaiting inside a cancelled-task context.
+    """
+
+    async def _run_event_stream(
+        self, request: RequestContext, queue: EventQueue
+    ) -> None:
+        try:
+            await self.agent_executor.execute(request, queue)
+            await queue.close()
+        except BaseException:
+            if not queue.is_closed():
+                queue._is_closed = True  # noqa: SLF001
+            raise
+
+
 class WeatherExecutor(AgentExecutor):
     """
     A class to handle weather assistant execution for A2A Agent.
@@ -240,7 +265,7 @@ def run():
     port = int(os.getenv("PORT", "8000"))
     agent_card = get_agent_card(host=host, port=port)
 
-    request_handler = DefaultRequestHandler(
+    request_handler = _FixedRequestHandler(
         agent_executor=WeatherExecutor(),
         task_store=InMemoryTaskStore(),
     )
