@@ -7,6 +7,8 @@ import logging
 import os
 import sys
 
+import urllib.parse
+
 import requests
 import uvicorn
 from fastmcp import FastMCP
@@ -101,38 +103,30 @@ async def get_weather(city: str) -> str:
     loop = asyncio.get_running_loop()
 
     try:
-        base_url = "https://geocoding-api.open-meteo.com/v1/search"
+        url = f"https://wttr.in/{urllib.parse.quote(city)}?format=j1"
         response = await loop.run_in_executor(
             None,
-            functools.partial(_session.get, base_url, params={"name": city, "count": 1}, timeout=_REQUEST_TIMEOUT),
+            functools.partial(_session.get, url, timeout=_REQUEST_TIMEOUT),
         )
         response.raise_for_status()
         data = response.json()
 
-        if not data or "results" not in data:
+        condition = data.get("current_condition", [{}])[0]
+        if not condition:
             result = f"City {city} not found"
             span.set_attribute("gen_ai.tool.call.result", result)
             span.set_status(Status(StatusCode.OK))
             return result
 
-        latitude = data["results"][0]["latitude"]
-        longitude = data["results"][0]["longitude"]
-
-        weather_url = "https://api.open-meteo.com/v1/forecast"
-        weather_params = {
-            "latitude": latitude,
-            "longitude": longitude,
-            "temperature_unit": "fahrenheit",
-            "current_weather": True,
-        }
-        weather_response = await loop.run_in_executor(
-            None,
-            functools.partial(_session.get, weather_url, params=weather_params, timeout=_REQUEST_TIMEOUT),
-        )
-        weather_response.raise_for_status()
-        weather_data = weather_response.json()
-
-        result = json.dumps(weather_data["current_weather"])
+        result = json.dumps({
+            "temperature_f": condition.get("temp_F"),
+            "temperature_c": condition.get("temp_C"),
+            "feels_like_f": condition.get("FeelsLikeF"),
+            "windspeed_mph": condition.get("windspeedMiles"),
+            "humidity": condition.get("humidity"),
+            "description": condition.get("weatherDesc", [{}])[0].get("value"),
+            "observation_time": condition.get("observation_time"),
+        })
         span.set_attribute("gen_ai.tool.call.result", result)
         span.set_status(Status(StatusCode.OK))
         return result
