@@ -26,9 +26,10 @@ import re
 import uuid
 
 import httpx
+import httpx2
 
 from mcp import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
+from mcp.client.streamable_http import create_mcp_http_client, streamable_http_client
 
 logger = logging.getLogger(__name__)
 
@@ -76,11 +77,8 @@ DECIDE_SYSTEM = (
 async def call_mcp_tool(url: str, tool: str, arguments: dict) -> str:
     """One MCP session per call: connect, initialize, invoke, close."""
     async with (
-        streamablehttp_client(url=url, timeout=MCP_TIMEOUT, sse_read_timeout=MCP_TIMEOUT) as (
-            read_stream,
-            write_stream,
-            _,
-        ),
+        create_mcp_http_client(timeout=httpx2.Timeout(MCP_TIMEOUT)) as http_client,
+        streamable_http_client(url, http_client=http_client) as (read_stream, write_stream),
         ClientSession(read_stream, write_stream) as session,
     ):
         await session.initialize()
