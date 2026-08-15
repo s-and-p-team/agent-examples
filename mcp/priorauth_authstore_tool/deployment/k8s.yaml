@@ -55,6 +55,7 @@ spec:
           env:
             - { name: HOST, value: "0.0.0.0" }
             - { name: PORT, value: "8000" }
+            - { name: UV_CACHE_DIR, value: "/app/.cache/uv" }
             - { name: AUTHSTORE_DATABASE_URL, value: "postgresql://authorizations:authorizations@priorauth-auth-db.team2.svc.cluster.local:5432/authorizations" }
           ports:
             - { containerPort: 8000, name: http }
@@ -66,6 +67,11 @@ spec:
           resources:
             requests: { cpu: 100m, memory: 256Mi }
             limits: { cpu: "1", memory: 1Gi }
+          volumeMounts:
+            - { name: cache, mountPath: /app/.cache }
+      volumes:
+        - name: cache
+          emptyDir: {}
 ---
 apiVersion: agent.rossoctl.dev/v1alpha1
 kind: AgentRuntime

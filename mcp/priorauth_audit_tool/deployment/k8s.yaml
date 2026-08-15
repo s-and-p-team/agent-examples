@@ -55,6 +55,7 @@ spec:
           env:
             - { name: HOST, value: "0.0.0.0" }
             - { name: PORT, value: "8000" }
+            - { name: UV_CACHE_DIR, value: "/app/.cache/uv" }
             - { name: AUDIT_DIR, value: "/audit" }
             - { name: REDIS_URL, value: "redis://priorauth-audit-redis.team2.svc.cluster.local:6379" }
           ports:
@@ -69,10 +70,13 @@ spec:
             limits: { cpu: "1", memory: 1Gi }
           volumeMounts:
             - { name: audit, mountPath: /audit }
+            - { name: cache, mountPath: /app/.cache }
       volumes:
         - name: audit
           persistentVolumeClaim:
             claimName: priorauth-audit-files
+        - name: cache
+          emptyDir: {}
 ---
 apiVersion: agent.rossoctl.dev/v1alpha1
 kind: AgentRuntime

@@ -55,6 +55,7 @@ spec:
           env:
             - { name: HOST, value: "0.0.0.0" }
             - { name: PORT, value: "8000" }
+            - { name: UV_CACHE_DIR, value: "/app/.cache/uv" }
             - { name: AGENT_ENDPOINT, value: "http://priorauth-eligibility.team2.svc.cluster.local:8080/" }
             - { name: RECORDS_MCP_URL, value: "http://priorauth-records-tool.team2.svc.cluster.local:8000/mcp" }
             - { name: LLM_API_BASE, value: "http://host.containers.internal:11434/v1" }
@@ -70,6 +71,11 @@ spec:
           resources:
             requests: { cpu: 100m, memory: 256Mi }
             limits: { cpu: "1", memory: 1Gi }
+          volumeMounts:
+            - { name: cache, mountPath: /app/.cache }
+      volumes:
+        - name: cache
+          emptyDir: {}
 ---
 apiVersion: agent.rossoctl.dev/v1alpha1
 kind: AgentRuntime
