@@ -5,16 +5,19 @@ determination:
 
 1.  **extract** the structured facts from the note with the model;
 2.  **identify** the member by MRN in the Patient Records service;
-3.  **file** the referral in the Authorization Store (a different service,
+3.  **code** the requested procedure in the Medical Coding service, because a
+    plan's exclusions are a list of CPT codes and the reviewers cannot match
+    words against them;
+4.  **file** the referral in the Authorization Store (a different service,
     backed by a different database);
-4.  **verify** the requesting provider against an external directory — the same
+5.  **verify** the requesting provider against an external directory — the same
     lookup is made over plain HTTP and over HTTPS;
-5.  **review**, asking the Eligibility and Clinical agents *concurrently*;
-6.  **decide**, with the model weighing both verdicts;
-7.  **record** the decision in the Authorization Store, and separately in the
+6.  **review**, asking the Eligibility and Clinical agents *concurrently*;
+7.  **decide**, with the model weighing both verdicts;
+8.  **record** the decision in the Authorization Store, and separately in the
     Audit Trail service, which writes it to a file and to Redis.
 
-Steps 5's two reviews run at the same time on purpose: the two agents are
+Step 6's two reviews run at the same time on purpose: the two agents are
 independent and a real system would not serialise them.
 """
 
@@ -36,6 +39,7 @@ logger = logging.getLogger(__name__)
 RECORDS_MCP_URL = os.getenv("RECORDS_MCP_URL", "http://priorauth-records-tool:8000/mcp")
 AUTHSTORE_MCP_URL = os.getenv("AUTHSTORE_MCP_URL", "http://priorauth-authstore-tool:8000/mcp")
 AUDIT_MCP_URL = os.getenv("AUDIT_MCP_URL", "http://priorauth-audit-tool:8000/mcp")
+CODING_MCP_URL = os.getenv("CODING_MCP_URL", "http://priorauth-coding-tool:8000/mcp")
 ELIGIBILITY_URL = os.getenv("ELIGIBILITY_URL", "http://priorauth-eligibility:8080/")
 CLINICAL_URL = os.getenv("CLINICAL_URL", "http://priorauth-clinical:8080/")
 
@@ -219,7 +223,20 @@ async def handle_referral(note: str) -> str:
     drug_name = str(facts.get("drug_name", ""))
     npi = str(facts.get("requesting_provider_npi", ""))
 
-    # 3. file the referral
+    # 3. code the request. The reviewers need the CPT code, not the words: a
+    # plan's exclusions are a list of codes, so an eligibility check without a
+    # code cannot see an exclusion at all.
+    coded = await call_mcp_tool(CODING_MCP_URL, "lookup_procedure_code", {"procedure": requested_procedure})
+    procedure_code = ""
+    try:
+        parsed_code = json.loads(coded) if coded else {}
+        if parsed_code.get("found"):
+            procedure_code = str(parsed_code.get("procedure_code", ""))
+    except (ValueError, TypeError):
+        logger.warning("could not parse the coding response: %r", coded[:200])
+    logger.info("coded %r -> %s", requested_procedure, procedure_code or "(no match)")
+
+    # 4. file the referral
     saved = await call_mcp_tool(
         AUTHSTORE_MCP_URL,
         "save_referral",
@@ -231,7 +248,7 @@ async def handle_referral(note: str) -> str:
             "diagnosis_name": diagnosis_name,
             "icd10_code": str(facts.get("icd10_code", "")),
             "requested_procedure": requested_procedure,
-            "procedure_code": "",
+            "procedure_code": procedure_code,
             "requesting_provider_npi": npi,
             "clinical_note": note,
         },
@@ -239,11 +256,11 @@ async def handle_referral(note: str) -> str:
     referral_id = json.loads(saved).get("referral_id", "PA-UNKNOWN") if saved else "PA-UNKNOWN"
     logger.info("filed referral %s", referral_id)
 
-    # 4. verify the provider against the external directory
+    # 5. verify the provider against the external directory
     directory = await verify_provider(npi)
     logger.info("provider directory: %s", directory)
 
-    # 5. review — both agents at once
+    # 6. review — both agents at once
     eligibility_task = ask_agent(
         ELIGIBILITY_URL,
         {
@@ -251,7 +268,7 @@ async def handle_referral(note: str) -> str:
             "mrn": mrn,
             "patient_name": patient_name,
             "policy_number": policy_number,
-            "procedure_code": "",
+            "procedure_code": procedure_code,
             "requested_procedure": requested_procedure,
         },
     )
@@ -268,7 +285,7 @@ async def handle_referral(note: str) -> str:
     eligibility_verdict, clinical_verdict = await asyncio.gather(eligibility_task, clinical_task)
     logger.info("verdicts collected for %s", referral_id)
 
-    # 6. decide
+    # 7. decide
     decision_line = await chat(
         DECIDE_SYSTEM,
         (
@@ -284,7 +301,7 @@ async def handle_referral(note: str) -> str:
             outcome = candidate
             break
 
-    # 7. record — once in the authorization store, once in the audit trail
+    # 8. record — once in the authorization store, once in the audit trail
     await call_mcp_tool(
         AUTHSTORE_MCP_URL,
         "save_decision",
@@ -317,6 +334,7 @@ async def handle_referral(note: str) -> str:
             "mrn": mrn,
             "policy_number": policy_number,
             "requested_procedure": requested_procedure,
+            "procedure_code": procedure_code,
             "outcome": outcome,
             "eligibility_verdict": eligibility_verdict,
             "clinical_verdict": clinical_verdict,
