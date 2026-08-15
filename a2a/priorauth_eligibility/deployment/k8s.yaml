@@ -1,0 +1,84 @@
+# priorauth-eligibility — part of the prior-authorization example.
+#
+# Deployed the rossoctl way: a plain Deployment + Service, adopted by an
+# AgentRuntime. The AgentRuntime is what stamps rossoctl.io/type and asks the
+# operator to inject the AuthBridge sidecar — the label cannot be set by hand
+# (ValidatingAdmissionPolicy agent-label-protection reserves it).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: priorauth-eligibility
+  namespace: team2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: priorauth-eligibility
+  namespace: team2
+  labels:
+    app.kubernetes.io/name: priorauth-eligibility
+spec:
+  ports:
+    - name: http
+      port: 8080
+      protocol: TCP
+      targetPort: 8000
+  selector:
+    app.kubernetes.io/name: priorauth-eligibility
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: priorauth-eligibility
+  namespace: team2
+  labels:
+    app.kubernetes.io/name: priorauth-eligibility
+    app.kubernetes.io/component: agent
+    app.kubernetes.io/part-of: priorauth
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: priorauth-eligibility
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: priorauth-eligibility
+        app.kubernetes.io/part-of: priorauth
+    spec:
+      serviceAccountName: priorauth-eligibility
+      containers:
+        - name: agent
+          image: docker.io/library/priorauth_eligibility:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - { name: HOST, value: "0.0.0.0" }
+            - { name: PORT, value: "8000" }
+            - { name: AGENT_ENDPOINT, value: "http://priorauth-eligibility.team2.svc.cluster.local:8080/" }
+            - { name: RECORDS_MCP_URL, value: "http://priorauth-records-tool.team2.svc.cluster.local:8000/mcp" }
+            - { name: LLM_API_BASE, value: "http://host.containers.internal:11434/v1" }
+            - { name: LLM_MODEL, value: "qwen2.5:7b" }
+            - { name: LLM_API_KEY, value: "ollama" }
+          ports:
+            - { containerPort: 8000, name: http }
+          readinessProbe:
+            tcpSocket: { port: 8000 }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 24
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: "1", memory: 1Gi }
+---
+apiVersion: agent.rossoctl.dev/v1alpha1
+kind: AgentRuntime
+metadata:
+  name: priorauth-eligibility
+  namespace: team2
+spec:
+  type: agent
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: priorauth-eligibility

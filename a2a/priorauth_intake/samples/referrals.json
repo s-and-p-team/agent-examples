@@ -1,0 +1,29 @@
+{
+  "_comment": "Six synthetic referral notes, one per member in the records seed data. Written the way a clinic writes them: prose, abbreviations, and every identifier a real note carries. No real person is described here.",
+  "referrals": [
+    {
+      "id": "referral-okonkwo",
+      "note": "PRIOR AUTH REQUEST — Rheumatology. Patient Miriam Okonkwo, MRN-4417822, DOB 03/14/1968, female. Address 412 Fairmount Ave, Apt 7B, Baltimore, MD 21217. Contact 410-555-0142, m.okonkwo@examplemail.net. Plan HP-88213445 (Meridian Gold PPO). Dx: rheumatoid arthritis, seropositive, inadequate response to methotrexate 15 mg weekly (RX-5590231). CRP 18.4 mg/L, RF 96 IU/mL on 06/10. Requesting biologic injection — adalimumab. Requesting provider NPI 1487302259, St. Agnes Regional Hospital."
+    },
+    {
+      "id": "referral-bielawski",
+      "note": "PRIOR AUTH REQUEST — Cardiology. Tomasz Bielawski, MRN-9930517, DOB 11/02/1955, male, 88 Larkspur Lane, Rochester NY 14620. Ph 585-555-0197, t.bielawski@examplemail.net. Coverage HP-44120987, Meridian Silver HMO. Chronic systolic heart failure, NT-proBNP 1840 pg/mL, creatinine 1.9 mg/dL, CKD stage 3. Currently on furosemide 40 mg BID and carvedilol 6.25 mg BID. Requesting transesophageal echo to assess valve function. Referring provider NPI 1558903221, Lakeside General Hospital."
+    },
+    {
+      "id": "referral-rahimi",
+      "note": "PRIOR AUTH REQUEST — Neurology. Aisha Rahimi, MRN-2261094, DOB 07/29/1990, female. 1530 Cedar Springs Rd, Unit 12, Dallas TX 75201. 214-555-0163, a.rahimi@examplemail.net. Policy HP-77650321 (Meridian Bronze EPO). Intractable migraine without aura, failing sumatriptan 100 mg PRN (RX-7729551). Hemoglobin 13.1 g/dL, otherwise unremarkable. Requesting MRI brain with and without contrast to exclude secondary cause. Provider NPI 1330558842, Trinity Park Medical Center."
+    },
+    {
+      "id": "referral-whitfield",
+      "note": "PRIOR AUTH REQUEST — Orthopedics. Devon Whitfield, MRN-7784310, DOB 01/19/1982, male, 9 Harborview Ct, Portland ME 04101, 207-555-0118, d.whitfield@examplemail.net. Plan HP-88213446, Meridian Gold PPO. Tear of medial meniscus right knee following a fall, ESR 11 mm/hr, managed on ibuprofen 600 mg TID (RX-8830127) without relief. Requesting MRI knee prior to considering arthroscopy. Attending NPI 1667203355, Harborview Community Hospital."
+    },
+    {
+      "id": "referral-ferreira",
+      "note": "PRIOR AUTH REQUEST — Oncology. Lucia Ferreira, MRN-5518203, DOB 09/06/1974, female. 2201 Mission St, San Francisco CA 94110. 415-555-0176, l.ferreira@examplemail.net. Policy HP-31009887, Meridian Platinum PPO. Malignant neoplasm of the upper-outer quadrant of the right breast, CA 15-3 41 U/mL on 06/29. Started anastrozole 1 mg daily (RX-9940318). Requesting infusion therapy per protocol. Requesting provider NPI 1774829906, Bay Ridge Cancer Institute."
+    },
+    {
+      "id": "referral-adeyemi",
+      "note": "PRIOR AUTH REQUEST — Endocrinology. Henry Adeyemi, MRN-3092776, DOB 05/23/2001, male, 77 Beechwood Dr, Columbus OH 43201. Ph 614-555-0155, h.adeyemi@examplemail.net. Plan HP-44120988, Meridian Silver HMO. Type 1 diabetes mellitus, HbA1c 8.7% on 05/07, on insulin glargine 22 units at bedtime (RX-1120887). Requesting CT angiography as part of a cardiovascular risk workup. Provider NPI 1885640022, Buckeye Metro Hospital."
+    }
+  ]
+}

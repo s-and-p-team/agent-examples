@@ -1,0 +1,144 @@
+# priorauth-records-tool — part of the prior-authorization example.
+#
+# Deployed the rossoctl way: a plain Deployment + Service, adopted by an
+# AgentRuntime. The AgentRuntime is what stamps rossoctl.io/type and asks the
+# operator to inject the AuthBridge sidecar — the label cannot be set by hand
+# (ValidatingAdmissionPolicy agent-label-protection reserves it).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: priorauth-records-tool
+  namespace: team2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: priorauth-records-tool
+  namespace: team2
+  labels:
+    app.kubernetes.io/name: priorauth-records-tool
+spec:
+  ports:
+    - name: http
+      port: 8000
+      protocol: TCP
+      targetPort: 8000
+  selector:
+    app.kubernetes.io/name: priorauth-records-tool
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: priorauth-records-tool
+  namespace: team2
+  labels:
+    app.kubernetes.io/name: priorauth-records-tool
+    app.kubernetes.io/component: tool
+    app.kubernetes.io/part-of: priorauth
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: priorauth-records-tool
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: priorauth-records-tool
+        app.kubernetes.io/part-of: priorauth
+    spec:
+      serviceAccountName: priorauth-records-tool
+      containers:
+        - name: tool
+          image: docker.io/library/priorauth_records_tool:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - { name: HOST, value: "0.0.0.0" }
+            - { name: PORT, value: "8000" }
+            - { name: RECORDS_DATABASE_URL, value: "postgresql://records:records@priorauth-records-db.team2.svc.cluster.local:5432/records" }
+          ports:
+            - { containerPort: 8000, name: http }
+          readinessProbe:
+            tcpSocket: { port: 8000 }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 24
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: "1", memory: 1Gi }
+---
+apiVersion: agent.rossoctl.dev/v1alpha1
+kind: AgentRuntime
+metadata:
+  name: priorauth-records-tool
+  namespace: team2
+spec:
+  type: tool
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: priorauth-records-tool
+---
+# priorauth-records-db — the Postgres instance behind one MCP server.
+#
+# Two separate databases exist in this example on purpose: one is only ever
+# read from, the other only ever written to, and they are different servers so
+# no component can quietly do both.
+apiVersion: v1
+kind: Service
+metadata:
+  name: priorauth-records-db
+  namespace: team2
+  labels:
+    app.kubernetes.io/name: priorauth-records-db
+spec:
+  ports:
+    - { name: postgres, port: 5432, protocol: TCP, targetPort: 5432 }
+  selector:
+    app.kubernetes.io/name: priorauth-records-db
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: priorauth-records-db
+  namespace: team2
+  labels:
+    app.kubernetes.io/name: priorauth-records-db
+    app.kubernetes.io/part-of: priorauth
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: priorauth-records-db
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: priorauth-records-db
+        app.kubernetes.io/part-of: priorauth
+    spec:
+      containers:
+        - name: postgres
+          image: docker.io/library/postgres:16-alpine
+          imagePullPolicy: IfNotPresent
+          env:
+            - { name: POSTGRES_USER, value: "records" }
+            - { name: POSTGRES_PASSWORD, value: "records" }
+            - { name: POSTGRES_DB, value: "records" }
+            - { name: PGDATA, value: "/var/lib/postgresql/data/pgdata" }
+          ports:
+            - { containerPort: 5432, name: postgres }
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "records"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - { name: initdb, mountPath: /docker-entrypoint-initdb.d }
+            - { name: data, mountPath: /var/lib/postgresql/data }
+      volumes:
+        - name: initdb
+          configMap:
+            name: priorauth-records-initdb
+        - name: data
+          emptyDir: {}
